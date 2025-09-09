@@ -1,1 +1,138 @@
 
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+provider = "prisma-client-js"
+}
+
+datasource db {
+provider = "postgresql"
+url      = env("DATABASE_URL")
+}
+
+model User {
+id          String         @id @default(cuid())
+name        String?
+email       String?        @unique
+role        Role?          @default(USER)
+password    String?
+profile_pic String?
+lastLogin   DateTime?      @db.Date
+createdAt   DateTime       @default(now())
+updatedAt   DateTime       @updatedAt
+verifications Verification[]
+documents     Document[]
+dailyChecks   DailyCheck[]
+subscription  Subscription?
+
+// Add indexes for faster search
+@@index([name])
+@@index([email])
+@@index([role])
+}
+
+enum Role {
+USER
+ADMIN
+}
+
+enum SubscriptionStatus {
+DEMO
+ACTIVE
+INACTIVE
+CANCELLED
+}
+
+model Subscription {
+id                  String           @id @default(cuid())
+status              SubscriptionStatus @default(DEMO)
+demoEndsAt          DateTime?
+currentPeriodEndsAt DateTime?
+stripeCustomerId    String?          @unique
+user                User             @relation(fields: [userId], references: [id])
+userId              String           @unique
+}
+
+model Verification {
+id        String     @id @default(cuid())
+userId    String
+email     String?
+code      Int?
+time      DateTime?
+isUsed    Boolean?   @default(false)
+createdAt DateTime   @default(now())
+updatedAt DateTime   @updatedAt
+user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+id               String         @id @default(cuid())
+userId           String
+documentTypeId   String
+file             String?
+expiryDate       DateTime?      @db.Date
+lastReminderSent DateTime?      @db.Date
+createdAt        DateTime       @default(now())
+updatedAt        DateTime       @updatedAt
+user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+documentType     DocumentType?  @relation(fields: [documentTypeId], references: [id], onDelete: Cascade)
+}
+
+model DocumentType {
+id        String     @id @default(cuid())
+name      String?
+createdAt DateTime   @default(now())
+updatedAt DateTime   @updatedAt
+documents Document[]
+}
+
+model DailyCheck {
+id            String @id @default(cuid())
+date          DateTime
+vehicleRegNo  String
+plateNo       String?
+mileage       Float
+notes         String?
+createdAt     DateTime @default(now())
+
+completedBy   User     @relation(fields: [completedById], references: [id])
+completedById String
+
+itemResponses ChecklistItemResponse[]
+}
+
+model ChecklistItemResponse {
+id              String        @id @default(cuid())
+status          CheckStatus
+
+dailyCheck      DailyCheck    @relation(fields: [dailyCheckId], references: [id], onDelete: Cascade)
+dailyCheckId    String
+
+checklistItem   ChecklistItem @relation(fields: [checklistItemId], references: [id])
+checklistItemId String
+}
+
+model ChecklistItem {
+id           String                  @id @default(cuid())
+area         String                  // e.g., "Lights", "Brakes"
+requirement  String                  // The detailed description of the check
+displayOrder Int                     @default(0) // To maintain the order shown in the UI
+responses    ChecklistItemResponse[]
+}
+
+enum CheckStatus {
+CORRECT
+FAULTY
+}
+
+model Link {
+id        String   @id @default(cuid())
+title     String
+url       String
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+}
